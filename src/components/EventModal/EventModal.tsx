@@ -1,47 +1,107 @@
-import { FC } from "react";
+import { FC, useEffect } from "react";
 import { useForm, SubmitHandler } from "react-hook-form";
+import { format, parseISO, isValid } from "date-fns";
 import styles from "./EventModal.module.scss";
 import { IEvent } from "../../modules/calendar/Calendar";
 
+interface IEventForm {
+    title: string;
+    date: string; 
+    startTime: string;
+    endTime: string;
+    notes?: string;
+}
+
 interface EventModalProps {
     isOpen: boolean;
-    top: number;
-    left: number;
     defaultDate?: string;
+    initialData?: IEvent;
     onCancel: () => void;
     onSave: (data: IEvent) => void;
+    onDelete?: () => void;
 }
 
 const EventModal: FC<EventModalProps> = ({
     isOpen,
-    top,
-    left,
     defaultDate,
+    initialData,
     onCancel,
     onSave,
+    onDelete,
 }) => {
     const {
         register,
         handleSubmit,
+        reset,
         formState: { errors },
-    } = useForm<IEvent>({
-        defaultValues: {
-            title: "",
-            start: defaultDate || "",
-            end: "",
-            notes: "",
-        },
+    } = useForm<IEventForm>({
+        defaultValues: initialData
+            ? {
+                  title: initialData.title,
+                  date: isValid(parseISO(initialData.start))
+                      ? format(parseISO(initialData.start), "yyyy-MM-dd")
+                      : "",
+                  startTime: isValid(parseISO(initialData.start))
+                      ? format(parseISO(initialData.start), "HH:mm")
+                      : "",
+                  endTime: isValid(parseISO(initialData.end))
+                      ? format(parseISO(initialData.end), "HH:mm")
+                      : "",
+                  notes: initialData.notes || "",
+              }
+            : {
+                  title: "",
+                  date: defaultDate || "",
+                  startTime: "",
+                  endTime: "",
+                  notes: "",
+              },
     });
+
+    useEffect(() => {
+        if (initialData) {
+            reset({
+                title: initialData.title,
+                date: isValid(parseISO(initialData.start))
+                    ? format(parseISO(initialData.start), "yyyy-MM-dd")
+                    : "",
+                startTime: isValid(parseISO(initialData.start))
+                    ? format(parseISO(initialData.start), "HH:mm")
+                    : "",
+                endTime: isValid(parseISO(initialData.end))
+                    ? format(parseISO(initialData.end), "HH:mm")
+                    : "",
+                notes: initialData.notes || "",
+            });
+        } else {
+            reset({
+                title: "",
+                date: defaultDate || "",
+                startTime: "",
+                endTime: "",
+                notes: "",
+            });
+        }
+    }, [initialData, defaultDate, reset]);
 
     if (!isOpen) return null;
 
     const modalStyle = {
-        top: `${top}px`,
-        left: `${left}px`,
+        top: "50%",
+        left: "50%",
+        transform: "translate(-50%, -50%)",
     };
 
-    const onSubmit: SubmitHandler<IEvent> = (data) => {
-        onSave(data);
+    const onSubmit: SubmitHandler<IEventForm> = (data) => {
+        const fullStart = `${data.date}T${data.startTime}`;
+        const fullEnd = `${data.date}T${data.endTime}`;
+        onSave({
+            id: initialData ? initialData.id : Date.now().toString(),
+            title: data.title,
+            start: fullStart,
+            end: fullEnd,
+            notes: data.notes,
+        });
     };
 
     return (
@@ -51,7 +111,12 @@ const EventModal: FC<EventModalProps> = ({
                 style={modalStyle}
                 onClick={(e) => e.stopPropagation()}
             >
-                <h2 className={styles.eventModal__title}>Создание события</h2>
+                <span
+                    onClick={onCancel}
+                    className={styles.eventModal__closeIcon}
+                >
+                    +{" "}
+                </span>
                 <form onSubmit={handleSubmit(onSubmit)}>
                     <div className={styles.eventModal__field}>
                         <label
@@ -62,29 +127,35 @@ const EventModal: FC<EventModalProps> = ({
                         </label>
                         <input
                             id="title"
-                            {...register("title", { required: true })}
+                            type="text"
+                            {...register("title", {
+                                required: true,
+                                maxLength: 30,
+                            })}
                             className={styles.eventModal__input}
+                            placeholder="Max 30 chars"
                         />
                         {errors.title && (
                             <span className={styles.eventModal__error}>
-                                Это поле обязательно
+                                Это поле обязательно и не должно превышать 30
+                                символов
                             </span>
                         )}
                     </div>
                     <div className={styles.eventModal__field}>
                         <label
-                            htmlFor="start"
+                            htmlFor="date"
                             className={styles.eventModal__label}
                         >
                             Event Date:
                         </label>
                         <input
-                            id="start"
+                            id="date"
                             type="date"
-                            {...register("start", { required: true })}
+                            {...register("date", { required: true })}
                             className={styles.eventModal__input}
                         />
-                        {errors.start && (
+                        {errors.date && (
                             <span className={styles.eventModal__error}>
                                 Это поле обязательно
                             </span>
@@ -92,18 +163,37 @@ const EventModal: FC<EventModalProps> = ({
                     </div>
                     <div className={styles.eventModal__field}>
                         <label
-                            htmlFor="end"
+                            htmlFor="startTime"
                             className={styles.eventModal__label}
                         >
-                            Event Time:
+                            Start Time:
                         </label>
                         <input
-                            id="end"
+                            id="startTime"
                             type="time"
-                            {...register("end", { required: true })}
+                            {...register("startTime", { required: true })}
                             className={styles.eventModal__input}
                         />
-                        {errors.end && (
+                        {errors.startTime && (
+                            <span className={styles.eventModal__error}>
+                                Это поле обязательно
+                            </span>
+                        )}
+                    </div>
+                    <div className={styles.eventModal__field}>
+                        <label
+                            htmlFor="endTime"
+                            className={styles.eventModal__label}
+                        >
+                            End Time:
+                        </label>
+                        <input
+                            id="endTime"
+                            type="time"
+                            {...register("endTime", { required: true })}
+                            className={styles.eventModal__input}
+                        />
+                        {errors.endTime && (
                             <span className={styles.eventModal__error}>
                                 Это поле обязательно
                             </span>
@@ -116,23 +206,35 @@ const EventModal: FC<EventModalProps> = ({
                         >
                             Notes:
                         </label>
-                        <textarea
+                        <input
                             id="notes"
-                            {...register("notes")}
-                            className={styles.eventModal__textarea}
+                            type="text"
+                            {...register("notes", { maxLength: 30 })}
+                            className={styles.eventModal__input}
+                            placeholder="Max 30 chars"
                         />
                     </div>
                     <div className={styles.eventModal__actions}>
-                        <button
-                            type="button"
-                            onClick={onCancel}
-                            className={styles.eventModal__button}
-                        >
-                            Cancel
-                        </button>
+                        {initialData ? (
+                            <button
+                                type="button"
+                                onClick={onDelete}
+                                className={`${styles.eventModal__button} ${styles.eventModal__cancel}`}
+                            >
+                                Discard
+                            </button>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={onCancel}
+                                className={`${styles.eventModal__button} ${styles.eventModal__cancel}`}
+                            >
+                                Cancel
+                            </button>
+                        )}
                         <button
                             type="submit"
-                            className={styles.eventModal__button}
+                            className={`${styles.eventModal__button} ${styles.eventModal__save}`}
                         >
                             Save
                         </button>
